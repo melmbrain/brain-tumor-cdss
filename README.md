@@ -4,6 +4,8 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-2.0+-red.svg)](https://pytorch.org/)
 [![MONAI](https://img.shields.io/badge/MONAI-1.0+-green.svg)](https://monai.io/)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![Open In Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/melmbrain/brain-tumor-cdss/blob/main/notebooks/demo.ipynb)
+[![Documentation](https://img.shields.io/badge/docs-GitHub%20Pages-blue)](https://melmbrain.github.io/brain-tumor-cdss/)
 
 > **MRI + Gene Expression + Protein 데이터를 통합한 뇌종양(Glioma) 예후 예측 시스템**
 
@@ -126,17 +128,21 @@ brain-tumor-cdss/
 ### 1. Installation
 
 ```bash
-git clone https://github.com/yourusername/brain-tumor-cdss.git
+git clone https://github.com/melmbrain/brain-tumor-cdss.git
 cd brain-tumor-cdss
 pip install -r requirements.txt
+
+# Or install via pip
+pip install brain-tumor-cdss
 ```
 
 ### 2. Download Pretrained Weights
 
 ```bash
 # Download from GitHub Releases
-wget https://github.com/yourusername/brain-tumor-cdss/releases/download/v1.0/weights.zip
-unzip weights.zip -d weights/
+curl -L -o weights/m1_best.pth https://github.com/melmbrain/brain-tumor-cdss/releases/download/v1.0.0/m1_best.pth
+curl -L -o weights/mg_best.pt https://github.com/melmbrain/brain-tumor-cdss/releases/download/v1.0.0/mg_4tasks_best.pt
+curl -L -o weights/mm_best.pt https://github.com/melmbrain/brain-tumor-cdss/releases/download/v1.0.0/mm_best.pt
 ```
 
 ### 3. Run Inference

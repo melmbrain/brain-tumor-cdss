@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  # Main application service
+  app:
+    build:
+      context: .
+      target: production
+    image: brain-tumor-cdss:latest
+    container_name: brain-tumor-cdss
+    volumes:
+      - ./weights:/app/weights:ro
+      - ./data:/app/data:ro
+      - ./outputs:/app/outputs
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: python inference/predict.py --help
+
+  # Development service with Jupyter
+  dev:
+    build:
+      context: .
+      target: development
+    image: brain-tumor-cdss:dev
+    container_name: brain-tumor-cdss-dev
+    ports:
+      - "8888:8888"
+    volumes:
+      - .:/app
+      - ./weights:/app/weights
+      - ./data:/app/data
+    environment:
+      - JUPYTER_TOKEN=braintumor
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    command: jupyter lab --ip=0.0.0.0 --port=8888 --no-browser --allow-root
+
+  # API service
+  api:
+    build:
+      context: .
+      target: api
+    image: brain-tumor-cdss:api
+    container_name: brain-tumor-cdss-api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./weights:/app/weights:ro
+    environment:
+      - CUDA_VISIBLE_DEVICES=0
+      - MODEL_DEVICE=cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # CPU-only version (no GPU required)
+  app-cpu:
+    build:
+      context: .
+      target: production
+    image: brain-tumor-cdss:cpu
+    container_name: brain-tumor-cdss-cpu
+    volumes:
+      - ./weights:/app/weights:ro
+      - ./data:/app/data:ro
+      - ./outputs:/app/outputs
+    environment:
+      - CUDA_VISIBLE_DEVICES=""
+      - MODEL_DEVICE=cpu
+    command: python inference/predict.py --device cpu --help
+
+networks:
+  default:
+    name: brain-tumor-network
