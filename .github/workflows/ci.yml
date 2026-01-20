@@ -1,0 +1,105 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.8', '3.9', '3.10']
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache pip packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install torch --index-url https://download.pytorch.org/whl/cpu
+        pip install pytest pytest-cov flake8
+        pip install -r requirements.txt
+
+    - name: Lint with flake8
+      run: |
+        # Stop build if there are Python syntax errors or undefined names
+        flake8 . --count --select=E9,F63,F7,F82 --show-source --statistics
+        # Exit-zero treats all errors as warnings
+        flake8 . --count --exit-zero --max-complexity=10 --max-line-length=120 --statistics
+
+    - name: Test imports
+      run: |
+        python -c "from models.m1 import MRIMultiTaskModel"
+        python -c "from models.mg import GeneExpressionCDSS"
+        python -c "from models.mm import MultimodalFusionModel"
+        python -c "from inference.predict import BrainTumorPredictor"
+
+    - name: Run model tests
+      run: |
+        python -c "
+        import torch
+        from models.m1 import MRIMultiTaskModel
+        from models.mg import GeneExpressionCDSS
+        from models.mm import MultimodalFusionModel
+
+        # Test M1
+        m1 = MRIMultiTaskModel(in_channels=4, embed_dim=48)
+        x = torch.randn(1, 4, 32, 32, 32)
+        out = m1(x)
+        assert 'grade_logits' in out
+        print('M1 test passed')
+
+        # Test MG
+        gene_emb = torch.randn(100, 64)
+        mg = GeneExpressionCDSS(gene_embeddings=gene_emb, n_pathways=48)
+        expr = torch.randn(1, 100)
+        pathway = torch.randn(1, 48)
+        out = mg(expr, pathway)
+        assert 'risk' in out
+        print('MG test passed')
+
+        # Test MM
+        mm = MultimodalFusionModel(mri_dim=768, gene_dim=64, protein_dim=167, clinical_dim=10)
+        mri = torch.randn(1, 768)
+        gene = torch.randn(1, 64)
+        protein = torch.randn(1, 167)
+        clinical = torch.randn(1, 10)
+        out = mm(mri, gene, protein, clinical)
+        assert 'grade_logits' in out
+        print('MM test passed')
+
+        print('All tests passed!')
+        "
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Check documentation
+      run: |
+        # Verify README exists and has content
+        test -f README.md
+        test -s README.md
+        echo "README.md exists and has content"
+
+        # Verify docs exist
+        test -f docs/ARCHITECTURE.md
+        test -f docs/EXPERIMENTS.md
+        echo "Documentation files exist"
