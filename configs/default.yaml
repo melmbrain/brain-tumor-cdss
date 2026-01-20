@@ -1,0 +1,215 @@
+# Brain Tumor CDSS Configuration
+
+# =============================================================================
+# Data Settings
+# =============================================================================
+data:
+  # Paths
+  mri_dir: "data/raw/mri"
+  gene_dir: "data/raw/gene"
+  protein_dir: "data/raw/protein"
+  processed_dir: "data/processed"
+
+  # Preprocessing
+  mri:
+    input_size: [128, 128, 128]
+    modalities: ["t1", "t1ce", "t2", "flair"]
+    normalize: true
+    skull_strip: true
+
+  gene:
+    num_genes: 500
+    normalize_method: "zscore"  # zscore, minmax, quantile
+
+  protein:
+    num_features: 229
+    normalize_method: "zscore"
+
+# =============================================================================
+# M1-Seg Model (SwinUNETR)
+# =============================================================================
+m1_seg:
+  # Architecture
+  model:
+    img_size: [128, 128, 128]
+    in_channels: 4
+    out_channels: 4
+    feature_size: 48
+    depths: [2, 2, 2, 2]
+    num_heads: [3, 6, 12, 24]
+    drop_rate: 0.0
+    attn_drop_rate: 0.0
+
+  # Training
+  training:
+    batch_size: 2
+    epochs: 300
+    learning_rate: 1.0e-4
+    weight_decay: 1.0e-5
+    scheduler: "cosine"
+    warmup_epochs: 10
+
+  # Loss
+  loss:
+    dice_weight: 0.5
+    ce_weight: 0.5
+    deep_supervision: true
+
+# =============================================================================
+# M1-Cls Model (Classification Heads)
+# =============================================================================
+m1_cls:
+  # Architecture
+  model:
+    input_dim: 768
+    hidden_dims: [256, 128]
+    dropout: 0.3
+
+  # Tasks
+  tasks:
+    grade:
+      type: "classification"
+      num_classes: 3
+    idh:
+      type: "binary"
+    mgmt:
+      type: "binary"
+    survival:
+      type: "cox"
+
+  # Training
+  training:
+    batch_size: 32
+    epochs: 100
+    learning_rate: 1.0e-3
+    weight_decay: 1.0e-4
+
+  # Multi-task Learning
+  mtl:
+    method: "uncertainty"  # uncertainty, equal, manual
+
+# =============================================================================
+# MG Model (VAE Encoder)
+# =============================================================================
+mg:
+  # Architecture
+  model:
+    input_dim: 500
+    encoder_dims: [256, 128]
+    latent_dim: 64
+    decoder_dims: [128, 256]
+    activation: "leaky_relu"
+
+  # VAE Settings
+  vae:
+    beta: 1.0  # KL weight
+    beta_schedule: "cyclical"  # constant, warmup, cyclical
+
+  # Training
+  training:
+    batch_size: 64
+    epochs: 200
+    learning_rate: 1.0e-3
+    weight_decay: 1.0e-4
+
+  # Tasks
+  tasks:
+    survival:
+      type: "cox"
+    event:
+      type: "binary"
+    recurrence:
+      type: "binary"
+    tmz_response:
+      type: "binary"
+
+# =============================================================================
+# MM Model (Multimodal Fusion)
+# =============================================================================
+mm:
+  # Architecture
+  model:
+    mri_dim: 768
+    gene_dim: 64
+    protein_dim: 229
+    projection_dim: 256
+
+  # Cross-Modal Attention
+  attention:
+    num_heads: 8
+    dropout: 0.1
+    num_layers: 2
+
+  # Fusion
+  fusion:
+    method: "attention"  # attention, concat, gated
+    hidden_dim: 256
+
+  # Training
+  training:
+    batch_size: 16
+    epochs: 100
+    learning_rate: 5.0e-4
+    weight_decay: 1.0e-4
+
+  # Transfer Learning
+  transfer:
+    freeze_m1: true
+    freeze_mg: true
+    finetune_epochs: 20  # epochs to finetune after initial training
+
+# =============================================================================
+# Survival Analysis (Cox Model)
+# =============================================================================
+cox:
+  # Loss
+  loss:
+    method: "partial_likelihood"  # partial_likelihood, efron, breslow
+
+  # Regularization
+  regularization:
+    l1: 0.0
+    l2: 1.0e-4
+
+  # Evaluation
+  evaluation:
+    bootstrap_samples: 100
+    confidence_level: 0.95
+
+# =============================================================================
+# Pathway Analysis (Inference Only)
+# =============================================================================
+pathway:
+  # ssGSEA Settings
+  ssgsea:
+    gene_sets: "hallmark"  # hallmark, kegg, reactome
+    num_pathways: 50
+    min_genes: 15
+
+  # Interpretation
+  interpretation:
+    top_k: 10  # Top pathways to report
+    threshold: 0.5  # Significance threshold
+
+# =============================================================================
+# General Settings
+# =============================================================================
+general:
+  seed: 42
+  num_workers: 4
+  device: "cuda"
+  mixed_precision: true
+
+  # Logging
+  logging:
+    level: "INFO"
+    tensorboard: true
+    wandb: false
+
+  # Checkpointing
+  checkpoint:
+    save_dir: "checkpoints"
+    save_best: true
+    save_last: true
+    monitor: "val_loss"
+    mode: "min"
